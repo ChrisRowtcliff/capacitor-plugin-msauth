@@ -2,13 +2,17 @@ import { PublicClientApplication } from '@azure/msal-browser';
 import { WebPlugin } from '@capacitor/core';
 
 import type { BaseOptions, MsAuthPlugin } from './definitions';
-
+enum InteractionMethod {
+  Popup,
+  Redirect
+}
 interface WebBaseOptions extends BaseOptions {
   redirectUri?: string;
 }
 
 interface WebLoginOptions extends WebBaseOptions {
   scopes: string[];
+  interactionMethod: InteractionMethod;
 }
 
 type WebLogoutOptions = WebBaseOptions;
@@ -25,7 +29,7 @@ export class MsAuth extends WebPlugin implements MsAuthPlugin {
 
     try {
       return await this.acquireTokenSilently(context, options.scopes).catch(() =>
-        this.acquireTokenInteractively(context, options.scopes)
+        this.acquireTokenInteractively(context, options.scopes, options.interactionMethod = InteractionMethod.Popup)
       );
     } catch (error) {
       console.error('MSAL: Error occurred while logging in', error);
@@ -65,11 +69,13 @@ export class MsAuth extends WebPlugin implements MsAuthPlugin {
     return window.location.href.split(/[?#]/)[0];
   }
 
-  private async acquireTokenInteractively(context: PublicClientApplication, scopes: string[]): Promise<AuthResult> {
-    const { accessToken, idToken } = await context.acquireTokenPopup({
+  private async acquireTokenInteractively(context: PublicClientApplication, scopes: string[], interactionMethod: InteractionMethod): Promise<AuthResult> {
+    const request = {
       scopes,
       prompt: 'select_account',
-    });
+    };
+
+    const { accessToken, idToken } = interactionMethod === InteractionMethod.Popup ? await context.acquireTokenPopup(request) : await context.acquireTokenRedirect(request);
 
     return { accessToken, idToken, scopes };
   }
